@@ -41,10 +41,9 @@ def get_gemini_response(input_text, prompt):
         # Bắt lỗi và trả về thông báo thân thiện
         return f"Đã xảy ra lỗi khi gọi API Gemini: {e}"
 
-def _get_text_from_docx(docx_bytes):
+def extract_text_from_docx(docx_bytes):
     """
-    Hàm nội bộ để trích xuất văn bản thô từ file .docx (dạng bytes).
-    CẬP NHẬT: Nâng cấp để đọc cả nội dung trong bảng (tables), không chỉ các đoạn văn thông thường.
+    Trích xuất văn bản thô từ file .docx (dạng bytes), bao gồm cả nội dung trong bảng.
     """
     try:
         doc = docx.Document(io.BytesIO(docx_bytes))
@@ -61,35 +60,6 @@ def _get_text_from_docx(docx_bytes):
     except Exception as e:
         st.error(f"Lỗi đọc file .docx: {e}")
         return None
-
-def convert_docx_to_pdf(docx_bytes):
-    """
-    Chuyển đổi file .docx (dưới dạng bytes) sang file .pdf (dưới dạng bytes).
-    Lưu ý: Đây là chuyển đổi dựa trên văn bản, bố cục gốc của file .docx sẽ không được giữ lại.
-    """
-    try:
-        # Bước 1: Trích xuất văn bản từ file .docx
-        text = _get_text_from_docx(docx_bytes)
-        if text is None:
-            return None
-
-        # Bước 2: Tạo một file PDF mới trong bộ nhớ
-        pdf_doc = fitz.open()
-        # Thêm một trang với kích thước A4
-        page = pdf_doc.new_page(width=595, height=842)
-
-        # Bước 3: Chèn văn bản đã trích xuất vào trang PDF
-        # insert_textbox sẽ tự động xử lý việc xuống dòng và ngắt trang cơ bản
-        page.insert_textbox(fitz.Rect(50, 50, 545, 792), text, fontsize=11, fontname="helv", align=fitz.TEXT_ALIGN_LEFT)
-
-        # Bước 4: Lưu file PDF ra dưới dạng bytes
-        pdf_bytes = pdf_doc.tobytes()
-        pdf_doc.close()
-        return pdf_bytes
-    except Exception as e:
-        st.error(f"Lỗi khi chuyển đổi DOCX sang PDF: {e}")
-        return None
-
 
 def extract_text_from_pdf(file_bytes):
     """
@@ -110,7 +80,7 @@ def extract_text_from_pdf(file_bytes):
 # --- Giao diện ứng dụng Streamlit ---
 
 st.title("✨ Trích xuất Thông tin từ Tài liệu với Gemini Pro")
-st.markdown("Tải lên tệp `.docx` hoặc `.pdf`. Tệp `.docx` sẽ được tự động chuyển sang `.pdf` trước khi xử lý.")
+st.markdown("Tải lên tệp `.docx` hoặc `.pdf` để bắt đầu.")
 
 # Tạo hai cột với tỉ lệ chiều rộng 2:3
 col1, col2 = st.columns([2, 3])
@@ -175,30 +145,23 @@ with col2:
                 file_bytes = uploaded_file.getvalue()
                 file_extension = uploaded_file.name.split('.')[-1].lower()
                 
-                pdf_for_processing = None
+                raw_text = None
                 
+                # QUAY LẠI LOGIC CŨ: Xử lý từng loại file riêng biệt
+                st.info(f"Đang đọc file {file_extension}...")
                 if file_extension == "docx":
-                    st.info("Phát hiện file .docx. Đang tiến hành chuyển đổi sang .pdf...")
-                    pdf_for_processing = convert_docx_to_pdf(file_bytes)
-                    if pdf_for_processing:
-                        st.success("Chuyển đổi thành công!")
-                    else:
-                        st.error("Lỗi trong quá trình chuyển đổi .docx sang .pdf.")
-                        st.stop()
+                    raw_text = extract_text_from_docx(file_bytes)
                 elif file_extension == "pdf":
-                    pdf_for_processing = file_bytes
+                    raw_text = extract_text_from_pdf(file_bytes)
 
-                # Trích xuất văn bản từ file pdf (gốc hoặc đã chuyển đổi)
-                st.info("Đang trích xuất văn bản...")
-                raw_text = extract_text_from_pdf(pdf_for_processing)
-                
-                if raw_text and raw_text.strip(): # Dùng strip() để đảm bảo chuỗi không chỉ chứa khoảng trắng
+                if raw_text and raw_text.strip():
+                    st.success("Đọc file thành công!")
                     st.info("Văn bản đã được trích xuất. Đang gửi yêu cầu đến Gemini...")
                     response = get_gemini_response(raw_text, prompt_user)
                     result_container.text_area("Thông tin đã trích xuất:", value=response, height=550)
-                elif raw_text is not None: # Trường hợp raw_text là chuỗi rỗng ""
+                elif raw_text is not None:
                     result_container.warning("Không tìm thấy nội dung văn bản nào trong file. File có thể chỉ chứa hình ảnh hoặc không có văn bản để trích xuất.")
-                else: # Trường hợp raw_text là None, tức là có lỗi xảy ra trong hàm extract_text_from_pdf
+                else:
                     result_container.error("Không thể đọc được nội dung từ file do có lỗi xảy ra trong quá trình xử lý. Vui lòng thử lại với file khác.")
         elif not uploaded_file:
             st.warning("Vui lòng tải lên một file để tiếp tục.")
