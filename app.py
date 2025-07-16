@@ -44,10 +44,19 @@ def get_gemini_response(input_text, prompt):
 def _get_text_from_docx(docx_bytes):
     """
     Hàm nội bộ để trích xuất văn bản thô từ file .docx (dạng bytes).
+    CẬP NHẬT: Nâng cấp để đọc cả nội dung trong bảng (tables), không chỉ các đoạn văn thông thường.
     """
     try:
         doc = docx.Document(io.BytesIO(docx_bytes))
-        full_text = [para.text for para in doc.paragraphs]
+        full_text = []
+        # Lặp qua các đoạn văn bản
+        for para in doc.paragraphs:
+            full_text.append(para.text)
+        # Lặp qua các bảng
+        for table in doc.tables:
+            for row in table.rows:
+                for cell in row.cells:
+                    full_text.append(cell.text)
         return '\n'.join(full_text)
     except Exception as e:
         st.error(f"Lỗi đọc file .docx: {e}")
@@ -168,7 +177,6 @@ with col2:
                 
                 pdf_for_processing = None
                 
-                # CẬP NHẬT LOGIC: Kiểm tra và chuyển đổi file .docx
                 if file_extension == "docx":
                     st.info("Phát hiện file .docx. Đang tiến hành chuyển đổi sang .pdf...")
                     pdf_for_processing = convert_docx_to_pdf(file_bytes)
@@ -184,12 +192,14 @@ with col2:
                 st.info("Đang trích xuất văn bản...")
                 raw_text = extract_text_from_pdf(pdf_for_processing)
                 
-                if raw_text:
+                if raw_text and raw_text.strip(): # Dùng strip() để đảm bảo chuỗi không chỉ chứa khoảng trắng
                     st.info("Văn bản đã được trích xuất. Đang gửi yêu cầu đến Gemini...")
                     response = get_gemini_response(raw_text, prompt_user)
                     result_container.text_area("Thông tin đã trích xuất:", value=response, height=550)
-                else:
-                    result_container.error("Không thể đọc được nội dung từ file. File có thể bị lỗi hoặc trống.")
+                elif raw_text is not None: # Trường hợp raw_text là chuỗi rỗng ""
+                    result_container.warning("Không tìm thấy nội dung văn bản nào trong file. File có thể chỉ chứa hình ảnh hoặc không có văn bản để trích xuất.")
+                else: # Trường hợp raw_text là None, tức là có lỗi xảy ra trong hàm extract_text_from_pdf
+                    result_container.error("Không thể đọc được nội dung từ file do có lỗi xảy ra trong quá trình xử lý. Vui lòng thử lại với file khác.")
         elif not uploaded_file:
             st.warning("Vui lòng tải lên một file để tiếp tục.")
         else:
