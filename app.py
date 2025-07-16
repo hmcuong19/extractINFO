@@ -7,12 +7,11 @@ import fitz  # PyMuPDF
 # --- Cấu hình và Thiết lập ---
 
 # Thiết lập tiêu đề và icon cho trang, sử dụng layout rộng để có 2 cột
-st.set_page_config(page_title="Trích xuất Thông tin Thông minh", page_icon="✨", layout="wide")
+st.set_page_config(page_title="Trích xuất Thông tin SEEE", page_icon="✨", layout="wide")
 
 # Lấy API key từ secrets của Streamlit để bảo mật
-# Hướng dẫn: https://docs.streamlit.io/deploy/streamlit-community-cloud/deploy-your-app/secrets-management
 try:
-    # Cố gắng lấy key từ Streamlit's secrets management
+    # Lấy key từ Streamlit's secrets management
     GOOGLE_API_KEY = st.secrets["GOOGLE_API_KEY"]
     genai.configure(api_key=GOOGLE_API_KEY)
 except (KeyError, FileNotFoundError):
@@ -31,9 +30,7 @@ except (KeyError, FileNotFoundError):
 def get_gemini_response(input_text, prompt):
     """
     Hàm gọi Gemini API để lấy phản hồi dựa trên văn bản và prompt.
-    Sử dụng model 'gemini-1.5-flash' là phiên bản mới và hiệu quả.
-    """
-    # CẬP NHẬT: Thay đổi tên model thành 'gemini-1.5-flash' để sửa lỗi 404
+    Sử dụng model 'gemini-1.5-flash'.
     model = genai.GenerativeModel('gemini-1.5-flash')
     try:
         response = model.generate_content([input_text, prompt])
@@ -73,8 +70,8 @@ def extract_text_from_pdf(file_bytes):
 
 # --- Giao diện ứng dụng Streamlit ---
 
-st.title("✨ Trích xuất Thông tin từ Tài liệu với Gemini Pro")
-st.markdown("Tải lên tệp `.docx` hoặc `.pdf` và sử dụng prompt để yêu cầu Gemini trích xuất các trường thông tin bạn cần.")
+st.title("✨ Trích xuất Thông tin từ Syllabus")
+st.markdown("Tải lên tệp `.docx` hoặc `.pdf` và sử dụng prompt để yêu cầu trích xuất các trường thông tin bạn cần.")
 
 # Tạo hai cột với tỉ lệ chiều rộng 2:3
 col1, col2 = st.columns([2, 3])
@@ -88,7 +85,6 @@ with col1:
     # CẬP NHẬT: Thay đổi prompt mặc định để trích xuất thông tin đề cương học phần
     prompt_default = """Bạn là một trợ lý AI chuyên nghiệp trong việc trích xuất thông tin.
 Dựa vào nội dung văn bản được cung cấp, hãy tách và liệt kê các thông tin sau:
-Từ nội dung đề cương học phần dưới đây, hãy trích xuất và trình bày rõ ràng các mục sau:
 Tên học phần
 Mã học phần (nếu có)
 Số tín chỉ
@@ -96,25 +92,25 @@ Số tín chỉ
 Mục tiêu học phần
 Chuẩn đầu ra của học phần (CLO)
 Nội dung học phần tóm tắt
-Tài liệu tham khảo (ghi rõ tên, tác giả, năm, NXB nếu có)
+Tài liệu hoặc sách tham khảo (ghi rõ tên, tác giả, năm, NXB nếu có)
 
 Trình bày câu trả lời theo định dạng rõ ràng như sau:
-Tên học phần: ...
-Mã học phần: ...
-Số tín chỉ: ...
-Điều kiện tiên quyết: ...
-Mục tiêu học phần:
++) Tên học phần: ...
++) Mã học phần: ...
++) Số tín chỉ: ...
++) Điều kiện tiên quyết: ...
++) Mục tiêu học phần:
 - ...
 - ...
-Chuẩn đầu ra:
++) Chuẩn đầu ra:
 - CLO1: ...
 - CLO2: ...
 ...
-Tóm tắt nội dung học phần:
++) Tóm tắt nội dung học phần:
 - Tuần 1: ...
 - Tuần 2: ...
 ...
-Tài liệu tham khảo:
++) Tài liệu tham khảo:
 - ...
 - ...
 
