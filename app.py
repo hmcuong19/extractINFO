@@ -140,14 +140,7 @@ with col2:
 
                 if raw_text:
                     response = get_gemini_response(raw_text, prompt_user)
-                    with result_container:
-    for section in response.split("\n\n"):
-        lines = section.strip().split("\n")
-        if lines:
-            title = lines[0]
-            body = "\n".join(lines[1:])
-            with st.expander(title):
-                st.markdown(body)
+                    result_container.markdown(response, unsafe_allow_html=False)
                 else:
                     result_container.error("Không thể đọc được nội dung từ file đã tải lên. File có thể bị lỗi hoặc trống.")
         elif not uploaded_file:
