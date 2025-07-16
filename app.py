@@ -31,10 +31,10 @@ except (KeyError, FileNotFoundError):
 def get_gemini_response(input_text, prompt):
     """
     Hàm gọi Gemini API để lấy phản hồi dựa trên văn bản và prompt.
-    Sử dụng model 'gemini-1.0-pro' là phiên bản ổn định.
+    Sử dụng model 'gemini-1.5-flash' là phiên bản mới và hiệu quả.
     """
-    # CẬP NHẬT: Thay đổi tên model thành 'gemini-1.0-pro' để sửa lỗi 404
-    model = genai.GenerativeModel('gemini-1.0-pro')
+    # CẬP NHẬT: Thay đổi tên model thành 'gemini-1.5-flash' để sửa lỗi 404
+    model = genai.GenerativeModel('gemini-1.5-flash')
     try:
         response = model.generate_content([input_text, prompt])
         return response.text
