@@ -33,7 +33,6 @@ def get_gemini_response(input_text, prompt):
     Hàm gọi Gemini API để lấy phản hồi dựa trên văn bản và prompt.
     Sử dụng model 'gemini-1.5-flash' là phiên bản mới và hiệu quả.
     """
-    # CẬP NHẬT: Thay đổi tên model thành 'gemini-1.5-flash' để sửa lỗi 404
     model = genai.GenerativeModel('gemini-1.5-flash')
     try:
         response = model.generate_content([input_text, prompt])
@@ -42,22 +41,50 @@ def get_gemini_response(input_text, prompt):
         # Bắt lỗi và trả về thông báo thân thiện
         return f"Đã xảy ra lỗi khi gọi API Gemini: {e}"
 
-def extract_text_from_docx(file_bytes):
+def _get_text_from_docx(docx_bytes):
     """
-    Hàm trích xuất toàn bộ văn bản từ file .docx.
-    Sử dụng io.BytesIO để đọc file từ bộ nhớ.
+    Hàm nội bộ để trích xuất văn bản thô từ file .docx (dạng bytes).
     """
     try:
-        doc = docx.Document(io.BytesIO(file_bytes))
+        doc = docx.Document(io.BytesIO(docx_bytes))
         full_text = [para.text for para in doc.paragraphs]
         return '\n'.join(full_text)
     except Exception as e:
         st.error(f"Lỗi đọc file .docx: {e}")
         return None
 
+def convert_docx_to_pdf(docx_bytes):
+    """
+    Chuyển đổi file .docx (dưới dạng bytes) sang file .pdf (dưới dạng bytes).
+    Lưu ý: Đây là chuyển đổi dựa trên văn bản, bố cục gốc của file .docx sẽ không được giữ lại.
+    """
+    try:
+        # Bước 1: Trích xuất văn bản từ file .docx
+        text = _get_text_from_docx(docx_bytes)
+        if text is None:
+            return None
+
+        # Bước 2: Tạo một file PDF mới trong bộ nhớ
+        pdf_doc = fitz.open()
+        # Thêm một trang với kích thước A4
+        page = pdf_doc.new_page(width=595, height=842)
+
+        # Bước 3: Chèn văn bản đã trích xuất vào trang PDF
+        # insert_textbox sẽ tự động xử lý việc xuống dòng và ngắt trang cơ bản
+        page.insert_textbox(fitz.Rect(50, 50, 545, 792), text, fontsize=11, fontname="helv", align=fitz.TEXT_ALIGN_LEFT)
+
+        # Bước 4: Lưu file PDF ra dưới dạng bytes
+        pdf_bytes = pdf_doc.tobytes()
+        pdf_doc.close()
+        return pdf_bytes
+    except Exception as e:
+        st.error(f"Lỗi khi chuyển đổi DOCX sang PDF: {e}")
+        return None
+
+
 def extract_text_from_pdf(file_bytes):
     """
-    Hàm trích xuất toàn bộ văn bản từ file .pdf bằng PyMuPDF.
+    Hàm trích xuất toàn bộ văn bản từ file .pdf (dạng bytes).
     """
     try:
         pdf_document = fitz.open(stream=file_bytes, filetype="pdf")
@@ -73,8 +100,8 @@ def extract_text_from_pdf(file_bytes):
 
 # --- Giao diện ứng dụng Streamlit ---
 
-st.title("✨ Trích xuất Thông tin từ Syllabus")
-st.markdown("Tải lên tệp `.docx` hoặc `.pdf` và sử dụng prompt để yêu cầu trích xuất các trường thông tin bạn cần.")
+st.title("✨ Trích xuất Thông tin từ Tài liệu với Gemini Pro")
+st.markdown("Tải lên tệp `.docx` hoặc `.pdf`. Tệp `.docx` sẽ được tự động chuyển sang `.pdf` trước khi xử lý.")
 
 # Tạo hai cột với tỉ lệ chiều rộng 2:3
 col1, col2 = st.columns([2, 3])
@@ -85,9 +112,10 @@ with col1:
     # Widget tải file
     uploaded_file = st.file_uploader("Chọn một tệp (.docx hoặc .pdf)", type=['docx', 'pdf'])
 
-    # CẬP NHẬT: Thay đổi prompt mặc định để trích xuất thông tin đề cương học phần
+    # Prompt mặc định
     prompt_default = """Bạn là một trợ lý AI chuyên nghiệp trong việc trích xuất thông tin.
-Từ nội dung đề cương học phần dưới đây, hãy trích xuất và trình bày rõ ràng theo dạng đánh số thứ tự các mục sau:
+Dựa vào nội dung văn bản được cung cấp, hãy tách và liệt kê các thông tin sau:
+Từ nội dung đề cương học phần dưới đây, hãy trích xuất và trình bày rõ ràng các mục sau:
 Tên học phần
 Mã học phần (nếu có)
 Số tín chỉ
@@ -96,6 +124,26 @@ Mục tiêu học phần
 Chuẩn đầu ra của học phần (CLO)
 Nội dung học phần tóm tắt
 Tài liệu tham khảo (ghi rõ tên, tác giả, năm, NXB nếu có)
+
+Trình bày câu trả lời theo định dạng rõ ràng như sau:
+Tên học phần: ...
+Mã học phần: ...
+Số tín chỉ: ...
+Điều kiện tiên quyết: ...
+Mục tiêu học phần:
+- ...
+- ...
+Chuẩn đầu ra:
+- CLO1: ...
+- CLO2: ...
+...
+Tóm tắt nội dung học phần:
+- Tuần 1: ...
+- Tuần 2: ...
+...
+Tài liệu tham khảo:
+- ...
+- ...
 
 Nếu không tìm thấy thông tin nào, hãy ghi là "Không tìm thấy".
 """
@@ -107,33 +155,41 @@ Nếu không tìm thấy thông tin nào, hãy ghi là "Không tìm thấy".
 with col2:
     st.header("2. Kết quả trích xuất")
 
-    # Vùng chứa kết quả, sử dụng st.container() để có thể cập nhật nội dung
+    # Vùng chứa kết quả
     result_container = st.container()
     result_container.info("Kết quả sẽ được hiển thị ở đây sau khi bạn nhấn nút 'Bắt đầu trích xuất'.")
 
     # Xử lý logic khi người dùng nhấn nút
     if submit_button:
         if uploaded_file is not None and prompt_user:
-            # Hiển thị spinner trong khi xử lý
-            with st.spinner("Đang đọc file và gửi yêu cầu đến Gemini... Vui lòng chờ! 🤖"):
-                # Đọc file dưới dạng bytes
+            with st.spinner("Đang xử lý file... Vui lòng chờ! 🤖"):
                 file_bytes = uploaded_file.getvalue()
-                
-                # Xác định loại file và trích xuất văn bản
                 file_extension = uploaded_file.name.split('.')[-1].lower()
-                raw_text = None
+                
+                pdf_for_processing = None
+                
+                # CẬP NHẬT LOGIC: Kiểm tra và chuyển đổi file .docx
                 if file_extension == "docx":
-                    raw_text = extract_text_from_docx(file_bytes)
+                    st.info("Phát hiện file .docx. Đang tiến hành chuyển đổi sang .pdf...")
+                    pdf_for_processing = convert_docx_to_pdf(file_bytes)
+                    if pdf_for_processing:
+                        st.success("Chuyển đổi thành công!")
+                    else:
+                        st.error("Lỗi trong quá trình chuyển đổi .docx sang .pdf.")
+                        st.stop()
                 elif file_extension == "pdf":
-                    raw_text = extract_text_from_pdf(file_bytes)
+                    pdf_for_processing = file_bytes
 
-                # Gọi Gemini API và hiển thị kết quả
+                # Trích xuất văn bản từ file pdf (gốc hoặc đã chuyển đổi)
+                st.info("Đang trích xuất văn bản...")
+                raw_text = extract_text_from_pdf(pdf_for_processing)
+                
                 if raw_text:
+                    st.info("Văn bản đã được trích xuất. Đang gửi yêu cầu đến Gemini...")
                     response = get_gemini_response(raw_text, prompt_user)
                     result_container.text_area("Thông tin đã trích xuất:", value=response, height=550)
                 else:
-                    result_container.error("Không thể đọc được nội dung từ file đã tải lên. File có thể bị lỗi hoặc trống.")
-        # Các trường hợp lỗi đầu vào từ người dùng
+                    result_container.error("Không thể đọc được nội dung từ file. File có thể bị lỗi hoặc trống.")
         elif not uploaded_file:
             st.warning("Vui lòng tải lên một file để tiếp tục.")
         else:
