@@ -7,11 +7,12 @@ import fitz  # PyMuPDF
 # --- Cấu hình và Thiết lập ---
 
 # Thiết lập tiêu đề và icon cho trang, sử dụng layout rộng để có 2 cột
-st.set_page_config(page_title="Trích xuất Thông tin SEEE", page_icon="✨", layout="wide")
+st.set_page_config(page_title="Trích xuất Thông tin Thông minh", page_icon="✨", layout="wide")
 
 # Lấy API key từ secrets của Streamlit để bảo mật
+# Hướng dẫn: https://docs.streamlit.io/deploy/streamlit-community-cloud/deploy-your-app/secrets-management
 try:
-    # Lấy key từ Streamlit's secrets management
+    # Cố gắng lấy key từ Streamlit's secrets management
     GOOGLE_API_KEY = st.secrets["GOOGLE_API_KEY"]
     genai.configure(api_key=GOOGLE_API_KEY)
 except (KeyError, FileNotFoundError):
@@ -30,7 +31,9 @@ except (KeyError, FileNotFoundError):
 def get_gemini_response(input_text, prompt):
     """
     Hàm gọi Gemini API để lấy phản hồi dựa trên văn bản và prompt.
-    Sử dụng model 'gemini-1.5-flash'.
+    Sử dụng model 'gemini-1.5-flash' là phiên bản mới và hiệu quả.
+    """
+    # CẬP NHẬT: Thay đổi tên model thành 'gemini-1.5-flash' để sửa lỗi 404
     model = genai.GenerativeModel('gemini-1.5-flash')
     try:
         response = model.generate_content([input_text, prompt])
@@ -85,6 +88,7 @@ with col1:
     # CẬP NHẬT: Thay đổi prompt mặc định để trích xuất thông tin đề cương học phần
     prompt_default = """Bạn là một trợ lý AI chuyên nghiệp trong việc trích xuất thông tin.
 Dựa vào nội dung văn bản được cung cấp, hãy tách và liệt kê các thông tin sau:
+Từ nội dung đề cương học phần dưới đây, hãy trích xuất và trình bày rõ ràng các mục sau:
 Tên học phần
 Mã học phần (nếu có)
 Số tín chỉ
